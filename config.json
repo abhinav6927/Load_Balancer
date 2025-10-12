@@ -1,0 +1,26 @@
+{
+  "load_balancer": {
+    "port": 8080,
+    "algorithms": ["round_robin", "least_connections", "ip_hash"],
+    "default_algorithm": "round_robin"
+  },
+  "backend_servers": [
+    {"id": 1, "port": 9001},
+    {"id": 2, "port": 9002},
+    {"id": 3, "port": 9003}
+  ],
+  "health_check": {
+    "interval": 5,
+    "timeout": 2,
+    "fail_threshold": 3
+  },
+  "gui": {
+    "port": 8000,
+    "frontend_port": 3000
+  },
+  "load_test": {
+    "default_requests": 1000,
+    "default_concurrency": 50,
+    "default_rps": 100
+  }
+}

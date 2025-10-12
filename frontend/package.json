@@ -1,0 +1,27 @@
+{
+  "name": "load-balancer-frontend",
+  "version": "1.0.0",
+  "description": "Load Balancer Control Panel Frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 3000",
+    "dev": "python -m http.server 3000 --bind localhost",
+    "serve": "python -m http.server 3000"
+  },
+  "keywords": [
+    "load-balancer",
+    "frontend",
+    "control-panel",
+    "monitoring",
+    "real-time"
+  ],
+  "author": "Load Balancer Project",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {},
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}

@@ -1,0 +1,21 @@
+
+{
+  "name": "load-balancer-gui",
+  "version": "1.0.0",
+  "description": "Load Balancer Control GUI",
+  "main": "start_project.js",
+  "scripts": {
+    "install-deps": "pip install -r requirements.txt",
+    "start": "node start_project.js",
+    "dev": "python -m http.server 3000",
+    "test": "python -m pytest tests/"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "concurrently": "^8.2.2"
+  },
+  "devDependencies": {},
+  "keywords": ["load-balancer", "asyncio", "fastapi"],
+  "author": "Load Balancer Project",
+  "license": "MIT"
+}
