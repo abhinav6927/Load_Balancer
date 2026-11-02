@@ -1,0 +1,47 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Generate frontend backend configuration
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "Set the BACKEND_URL Actions variable to your Render service URL."
+            exit 1
+          fi
+          node -e 'const fs = require("fs"); const url = new URL(process.env.BACKEND_URL); if (!["http:", "https:"].includes(url.protocol)) throw new Error("BACKEND_URL must use HTTP or HTTPS"); fs.writeFileSync("frontend/config.js", "window.LOAD_BALANCER_CONFIG = " + JSON.stringify({ apiBaseUrl: url.origin, tokenRequired: true }) + ";\n");'
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend
+
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4
