@@ -13,9 +13,9 @@ class WebSocketHandler:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, subprotocol: str = None):
         """Accept a new WebSocket connection"""
-        await websocket.accept()
+        await websocket.accept(subprotocol=subprotocol)
         self.active_connections.append(websocket)
         logger.info(f"WebSocket client connected. Total connections: {len(self.active_connections)}")
         

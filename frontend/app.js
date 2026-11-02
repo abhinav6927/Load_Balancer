@@ -9,22 +9,30 @@ class LoadBalancerApp {
         this.graphPaused = false;
         this.autoScroll = true;
         this.modalConfirmCallback = null;
+        this.apiBaseUrl = (window.LOAD_BALANCER_CONFIG?.apiBaseUrl || 'http://localhost:8000').replace(/\/+$/, '');
+        this.controlTokenRequired = Boolean(window.LOAD_BALANCER_CONFIG?.tokenRequired);
+        this.controlToken = sessionStorage.getItem('lb_control_token') || '';
+        if (this.controlTokenRequired && !this.controlToken) {
+            this.controlToken = prompt('Enter the deployment control token:') || '';
+            if (this.controlToken) sessionStorage.setItem('lb_control_token', this.controlToken);
+        }
         
         this.init();
     }
     
     init() {
-        this.setupWebSocket();
         this.setupEventListeners();
         this.setupGraph();
-        this.loadStatus();
+        this.loadStatus().finally(() => this.setupWebSocket());
     }
     
     setupWebSocket() {
-        const wsUrl = `ws://localhost:8000/ws`;
+        const wsUrl = new URL(this.apiBaseUrl + '/ws');
+        wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         
         try {
-            this.ws = new WebSocket(wsUrl);
+            const protocols = this.controlTokenRequired ? ['load-balancer', this.controlToken] : undefined;
+            this.ws = protocols ? new WebSocket(wsUrl.toString(), protocols) : new WebSocket(wsUrl.toString());
             
             this.ws.onopen = () => {
                 this.connected = true;
@@ -93,6 +101,7 @@ class LoadBalancerApp {
                 method,
                 headers: {
                     'Content-Type': 'application/json',
+                    ...(this.controlToken ? { 'X-Control-Token': this.controlToken } : {}),
                 },
             };
             
@@ -100,7 +109,18 @@ class LoadBalancerApp {
                 options.body = JSON.stringify(data);
             }
             
-            const response = await fetch(`http://localhost:8000${url}`, options);
+            const response = await fetch(this.apiBaseUrl + url, options);
+            if (response.status === 401 && this.controlTokenRequired) {
+                const token = prompt('The control token was rejected. Enter it again:') || '';
+                if (!token) throw new Error('A valid control token is required');
+                this.controlToken = token;
+                sessionStorage.setItem('lb_control_token', token);
+                options.headers['X-Control-Token'] = token;
+                const retry = await fetch(this.apiBaseUrl + url, options);
+                if (!retry.ok) throw new Error('Request failed (' + retry.status + ')');
+                return await retry.json();
+            }
+            if (!response.ok) throw new Error('Request failed (' + response.status + ')');
             const result = await response.json();
             
             if (!result.success && result.error) {

@@ -1,13 +1,15 @@
 import asyncio
 import json
 import logging
+import os
+import secrets
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, WebSocket, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -28,14 +30,32 @@ with open(config_path, 'r') as f:
 
 app = FastAPI(title="Load Balancer GUI Backend")
 
-# CORS middleware
+# Restrict browser access to the local development UI and configured frontend origins.
+FRONTEND_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("FRONTEND_ORIGIN", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+CONTROL_TOKEN = os.getenv("CONTROL_TOKEN", "")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Control-Token"],
 )
+
+@app.middleware("http")
+async def protect_control_api(request: Request, call_next):
+    if (
+        CONTROL_TOKEN
+        and request.url.path.startswith("/api/")
+        and request.method != "OPTIONS"
+        and not secrets.compare_digest(request.headers.get("x-control-token", ""), CONTROL_TOKEN)
+    ):
+        return JSONResponse(status_code=401, content={"detail": "Invalid or missing control token"})
+    return await call_next(request)
 
 # Global state
 process_manager = ProcessManager()
@@ -64,7 +84,17 @@ async def shutdown_event():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates"""
-    await websocket_handler.connect(websocket)
+    if CONTROL_TOKEN:
+        offered_protocols = {
+            protocol.strip()
+            for protocol in websocket.headers.get("sec-websocket-protocol", "").split(",")
+        }
+        if not any(secrets.compare_digest(protocol, CONTROL_TOKEN) for protocol in offered_protocols):
+            await websocket.close(code=1008)
+            return
+        await websocket_handler.connect(websocket, subprotocol="load-balancer")
+    else:
+        await websocket_handler.connect(websocket)
 
 @app.post("/api/servers/start")
 async def start_servers():
